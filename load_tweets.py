@@ -89,21 +89,23 @@ def insert_tweet(connection,tweet):
     You'll need to add appropriate SQL insert statements to get it to work.
     '''
 
-    # skip tweet if it's already inserted
-    sql=sqlalchemy.sql.text('''
-    SELECT id_tweets 
-    FROM tweets
-    WHERE id_tweets = :id_tweets
-    ''')
-    res = connection.execute(sql,{
-        'id_tweets':tweet['id'],
-        })
-    if res.first() is not None:
-        return
 
     # insert tweet within a transaction;
     # this ensures that a tweet does not get "partially" loaded
     with connection.begin() as trans:
+        # skip tweet if it's already inserted
+        sql=sqlalchemy.sql.text('''
+        SELECT id_tweets 
+        FROM tweets
+        WHERE id_tweets = :id_tweets
+        ''')
+        res = connection.execute(sql,{
+            'id_tweets':tweet['id'],
+            })
+        if res.first() is not None:
+            return
+
+
 
         ########################################
         # insert into the users table
@@ -147,26 +149,13 @@ def insert_tweet(connection,tweet):
                 :location,
                 :description,
                 :withheld_in_countries
-            ) ON CONFLICT (id_users)  DO UPDATE SET
-                created_at = EXCLUDED.created_at,
-                updated_at = CURRENT_TIMESTAMP,
-                id_urls = EXCLUDED.id_urls,
-                friends_count = EXCLUDED.friends_count,
-                listed_count = EXCLUDED.listed_count,
-                favourites_count = EXCLUDED.favourites_count,
-                statuses_count = EXCLUDED.statuses_count,
-                protected = EXCLUDED.protected,
-                verified = EXCLUDED.verified,
-                screen_name = EXCLUDED.screen_name,
-                name = EXCLUDED.name,
-                location = EXCLUDED.location,
-                description = EXCLUDED.description,
-                withheld_in_countries = EXCLUDED.withheld_in_countries;
+            ) ON CONFLICT DO NOTHING;
         ''')
         
         connection.execute(sql, {
             'id_users': tweet['user']['id'],
             'created_at': tweet['user']['created_at'],
+            'updated_at': tweet['created_at'],
             'id_urls': user_id_urls,
             'friends_count': tweet['user']['friends_count'],
             'listed_count': tweet['user']['listed_count'],
@@ -178,7 +167,7 @@ def insert_tweet(connection,tweet):
             'name': remove_nulls(tweet['user']['name']),
             'location': remove_nulls(tweet['user']['location']),
             'description': remove_nulls(tweet['user']['description']),
-            'withheld_in_countries': tweet['user'].get('withheld_in_countries', None),
+            'withheld_in_countries': tweet['user'].get('withheld_in_countries', None)
         })
 
 
